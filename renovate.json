@@ -8,6 +8,16 @@
       "managerFilePatterns": ["/(^|/)Dockerfile$/"],
       "matchStrings": ["(?<depName>asciidoctor[a-z-]*):(?<currentValue>[0-9][0-9.]+)"],
       "datasourceTemplate": "rubygems"
+    },
+    {
+      "customType": "regex",
+      "description": "Theme repos cloned in the Dockerfile, pinned to a main commit and bumped via the git-refs datasource.",
+      "managerFilePatterns": ["/(^|/)Dockerfile$/"],
+      "matchStrings": [
+        "ARG \\w+_THEME_REPO=(?<packageName>\\S+)\\s+#\\s*renovate:\\s*currentValue=(?<currentValue>\\S+)\\s+ARG \\w+_THEME_REF=(?<currentDigest>[a-f0-9]{40})"
+      ],
+      "datasourceTemplate": "git-refs",
+      "depNameTemplate": "{{packageName}}"
     }
   ]
 }
