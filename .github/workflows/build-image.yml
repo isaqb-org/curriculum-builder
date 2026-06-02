@@ -1,0 +1,144 @@
+name: build-image
+
+# Builds the curriculum-builder image on every PR and on main (validation: it
+# must build cleanly for both architectures). Publishing to the GitHub Container
+# Registry happens ONLY on a release tag; the run summary then prints the
+# published digest to pin downstream (curriculum repos reference IMAGE + DIGEST
+# in their curriculum-build.sh).
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['[2-9][0-9][0-9][0-9].[0-9]+-rev[0-9]+']
+  workflow_dispatch: {}   # manual build-only validation (does not publish)
+
+concurrency:
+  group: build-image-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}   # isaqb-org/curriculum-builder
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the GitHub release on tag push
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine whether to publish
+        id: gate
+        # Publish only on a release tag push (refs/tags/). PRs, main, and
+        # manual dispatch build for validation but never push. Also derive the
+        # version/major (2026.1-rev0 -> 2026.1-rev0 / 2026) for reuse below.
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && \
+             [ "${{ startsWith(github.ref, 'refs/tags/') }}" = "true" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "major=${VERSION%%.*}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        # Enables cross-building the linux/arm64 image on the amd64 runner.
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: steps.gate.outputs.publish == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive image tags and labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # iSAQB calendar versioning: 2026.1-rev0
+          #   major = 2026, minor = .1, patch = rev0  (not semver — match by regex).
+          # Produces tags: 2026.1-rev0, 2026.1, 2026, latest.
+          tags: |
+            type=match,pattern=(.*),group=1
+            type=match,pattern=(\d+\.\d+),group=1
+            type=match,pattern=(\d+),group=1
+          # Every release tag also moves the floating `latest`.
+          flavor: |
+            latest=true
+
+      - name: Build (and push on release tags)
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ steps.gate.outputs.publish == 'true' }}
+          # Single manifest list spanning both CPU architectures. The pushed
+          # digest is the index digest — pinning it downstream resolves to the
+          # matching arch automatically (Apple Silicon, ARM CI, and x86 alike).
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Themes track main and are re-cloned each build (their RUN layer is
+          # not content-addressed); gem layers cache across runs.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: Publish digest to run summary
+        if: steps.gate.outputs.publish == 'true'
+        run: |
+          {
+            echo "## Published image"
+            echo
+            echo "**Digest** (pin this in the curriculum repo's \`curriculum-build.sh\`):"
+            echo
+            echo '```sh'
+            echo "IMAGE=\"${REGISTRY}/${IMAGE_NAME}:${{ steps.gate.outputs.major }}\""
+            echo "DIGEST=\"${{ steps.build.outputs.digest }}\""
+            echo '```'
+            echo
+            echo "**Tags published:**"
+            echo
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create GitHub release
+        if: steps.gate.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MAJOR: ${{ steps.gate.outputs.major }}
+          VERSION: ${{ steps.gate.outputs.version }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          # --generate-notes adds the auto changelog; --notes-file supplies our
+          # pin snippet, which gh prepends to the generated notes.
+          cat > release-notes.md <<EOF
+          Container image published to \`${REGISTRY}/${IMAGE_NAME}\`.
+
+          Pin it in a curriculum repo's \`curriculum-build.sh\`:
+
+          \`\`\`sh
+          IMAGE="${REGISTRY}/${IMAGE_NAME}:${MAJOR}"
+          DIGEST="${DIGEST}"
+          \`\`\`
+
+          Published tags: \`${VERSION}\`, \`${MAJOR}\`, \`latest\`.
+          EOF
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            --generate-notes \
+            --verify-tag

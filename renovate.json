@@ -1,0 +1,13 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["local>isaqb-org/renovate-config"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Pinned asciidoctor gems in the Dockerfile (the base image is handled by the built-in Docker manager).",
+      "managerFilePatterns": ["/(^|/)Dockerfile$/"],
+      "matchStrings": ["(?<depName>asciidoctor[a-z-]*):(?<currentValue>[0-9][0-9.]+)"],
+      "datasourceTemplate": "rubygems"
+    }
+  ]
+}

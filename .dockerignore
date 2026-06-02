@@ -1,0 +1,12 @@
+# Keep the build context minimal. Only the Dockerfile's COPY targets are needed:
+#   extensions/, build.sh, build.config
+.git
+.github
+.gitignore
+.dockerignore
+README.md
+renovate.json
+curriculum-build.sh
+build/
+*.pdf
+*.html
