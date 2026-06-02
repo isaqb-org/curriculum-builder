@@ -99,11 +99,11 @@ Releases use iSAQB **calendar versioning**: `v<year>.<minor>-rev<patch>`, e.g. `
 `2026.1-rev0`, `2026.1`, `2026`, and `latest`. Downstream pins the major (`:2026`) plus a digest.
 
 `.github/workflows/build-image.yml` runs on every pull request, on push to `main`, and on
-`v*` tags (plus manual `workflow_dispatch`). The build/publish split is deliberate:
+tags (plus manual `workflow_dispatch`). The build/publish split is deliberate:
 
 - **PR / `main` / dispatch** — builds the image for **both architectures** (the arm64 image is
   cross-built under QEMU) to validate that it compiles. Nothing is pushed.
-- **`v*` tag** — builds, pushes the multi-arch manifest list to `ghcr.io/<owner>/<repo>`, and
+- **tag** — builds, pushes the multi-arch manifest list to `ghcr.io/<owner>/<repo>`, and
   creates a matching **GitHub release**. The release notes and the run summary both carry the
   digest to pin downstream. Because the pushed digest is the manifest-list (index) digest, a
   single pinned digest resolves to the right CPU architecture automatically.
