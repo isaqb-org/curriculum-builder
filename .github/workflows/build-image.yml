@@ -2,14 +2,14 @@ name: build-image
 
 # Builds the curriculum-builder image on every PR and on main (validation: it
 # must build cleanly for both architectures). Publishing to the GitHub Container
-# Registry happens ONLY on a release tag (v*); the run summary then prints the
+# Registry happens ONLY on a release tag; the run summary then prints the
 # published digest to pin downstream (curriculum repos reference IMAGE + DIGEST
 # in their curriculum-build.sh).
 on:
   pull_request:
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ['[2-9][0-9][0-9][0-9].[0-9]+-rev[0-9]+']
   workflow_dispatch: {}   # manual build-only validation (does not publish)
 
 concurrency:
@@ -32,12 +32,12 @@ jobs:
 
       - name: Determine whether to publish
         id: gate
-        # Publish only on a release tag push (refs/tags/v*). PRs, main, and
+        # Publish only on a release tag push (refs/tags/). PRs, main, and
         # manual dispatch build for validation but never push. Also derive the
-        # version/major (v2026.1-rev0 -> 2026.1-rev0 / 2026) for reuse below.
+        # version/major (2026.1-rev0 -> 2026.1-rev0 / 2026) for reuse below.
         run: |
           if [ "${{ github.event_name }}" = "push" ] && \
-             [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = "true" ]; then
+             [ "${{ startsWith(github.ref, 'refs/tags/') }}" = "true" ]; then
             echo "publish=true" >> "$GITHUB_OUTPUT"
           else
             echo "publish=false" >> "$GITHUB_OUTPUT"
@@ -66,13 +66,13 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          # iSAQB calendar versioning: v2026.1-rev0
+          # iSAQB calendar versioning: 2026.1-rev0
           #   major = 2026, minor = .1, patch = rev0  (not semver — match by regex).
           # Produces tags: 2026.1-rev0, 2026.1, 2026, latest.
           tags: |
-            type=match,pattern=v(.*),group=1
-            type=match,pattern=v(\d+\.\d+),group=1
-            type=match,pattern=v(\d+),group=1
+            type=match,pattern=(.*),group=1
+            type=match,pattern=(\d+\.\d+),group=1
+            type=match,pattern=(\d+),group=1
           # Every release tag also moves the floating `latest`.
           flavor: |
             latest=true
