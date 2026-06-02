@@ -1,0 +1,10 @@
+# Render output (produced by build.sh / curriculum-build.sh into ./build).
+/build/
+
+# Local render artifacts.
+*.pdf
+*.html
+
+# OS / editor cruft.
+.DS_Store
+*.swp
