@@ -17,6 +17,7 @@ EXT_DIR=${EXT_DIR:-$ISAQB_HOME/extensions}
 LANGUAGES=${LANGUAGES:-"DE EN"}
 SUFFIX_TAGS=${SUFFIX_TAGS:-""}
 PREPRESS=${PREPRESS:-false}
+VALID_FROM=${VALID_FROM:-""}
 VERSION=${RELEASE_VERSION:-LocalBuild}
 VERSION_DATE=$(date +%Y%m%d)
 
@@ -32,6 +33,32 @@ LG_OVERVIEW_RB="$EXT_DIR/learning-goals-overview.rb"
 
 mkdir -p "$OUT"
 
+# Localized " (valid from ...)" suffix from VALID_FROM (YYYY/MM/DD). Empty if
+# unset or malformed. Has spaces, so it is NOT emitted via common_attrs (which
+# is word-split) but appended as a single quoted -a arg in render().
+format_validity() {
+  vf_lang=$1
+  [ -z "$VALID_FROM" ] && return 0
+  case "$VALID_FROM" in
+    [0-9][0-9][0-9][0-9]/[0-9][0-9]/[0-9][0-9]) ;;
+    *) return 0 ;;
+  esac
+  vf_year=${VALID_FROM%%/*}
+  vf_rest=${VALID_FROM#*/}
+  vf_mnum=${vf_rest%%/*}; vf_mnum=${vf_mnum#0}
+  vf_day=${vf_rest#*/};   vf_day=${vf_day#0}
+  { [ "$vf_mnum" -ge 1 ] && [ "$vf_mnum" -le 12 ]; } 2>/dev/null || return 0
+  if [ "$vf_lang" = "DE" ]; then
+    set -- Januar Februar März April Mai Juni Juli August September Oktober November Dezember
+    eval vf_mname=\${$vf_mnum}
+    printf '%s' " (Gültig ab ${vf_day}. ${vf_mname} ${vf_year})"
+  else
+    set -- January February March April May June July August September October November December
+    eval vf_mname=\${$vf_mnum}
+    printf '%s' " (valid from ${vf_mname} ${vf_day}, ${vf_year})"
+  fi
+}
+
 common_attrs() {
   lang=$1; suffix=$2
   file_version="${VERSION}-${lang}"
@@ -40,7 +67,6 @@ common_attrs() {
      -a version-label= \
      -a revnumber=${file_version} \
      -a revdate=${VERSION_DATE} \
-     -a document-version=${file_version}-${VERSION_DATE} \
      -a currentDate=${VERSION_DATE} \
      -a release-version=${VERSION} \
      -a language=${lang} \
@@ -57,19 +83,23 @@ render() {
   [ -n "$suffix" ] && suffix_part="-$(echo "$suffix" | tr '[:upper:]' '[:lower:]')"
   lang_lc=$(echo "$lang" | tr '[:upper:]' '[:lower:]')
 
+  docver="${VERSION}-${lang}-${VERSION_DATE}$(format_validity "$lang")"
+
   # shellcheck disable=SC2046
   if [ "$format" = "pdf" ]; then
     set -- $(common_attrs "$lang" "$suffix") \
       -a compress \
       -a pdf-themesdir="$PDF_THEME_DIR" -a pdf-theme=isaqb \
-      -a pdf-fontsdir="$PDF_FONTS_DIR"
+      -a pdf-fontsdir="$PDF_FONTS_DIR" \
+      -a "document-version=$docver"
     [ "$PREPRESS" = "true" ] && set -- "$@" -a prepress
     asciidoctor-pdf -r "$PAGE_NUMBERING_RB" -r "$LG_OVERVIEW_RB" \
       --base-dir "$DOCS" -D "$OUT" "$@" "$DOCS/${CURRICULUM_FILE}.adoc"
     mv "$OUT/${CURRICULUM_FILE}.pdf" "$OUT/${CURRICULUM_FILE}${suffix_part}-${lang_lc}.pdf"
   else
     set -- $(common_attrs "$lang" "$suffix") \
-      -a stylesheet="$HTML_CSS"
+      -a stylesheet="$HTML_CSS" \
+      -a "document-version=$docver"
     asciidoctor -r "$LG_OVERVIEW_RB" \
       --base-dir "$DOCS" -D "$OUT" "$@" \
       "$DOCS/index.adoc" "$DOCS/${CURRICULUM_FILE}.adoc"
