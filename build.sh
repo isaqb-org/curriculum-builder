@@ -3,6 +3,7 @@
 #   build.sh                 # all languages x formats
 #   build.sh pdf DE          # single format + language
 #   build.sh pdf DE REMARKS  # + suffix tag
+#   build.sh clean           # remove build/ outputs
 # Config precedence: environment > repo build.config > baked default.
 set -eu
 
@@ -12,6 +13,14 @@ EXT_DIR=${EXT_DIR:-$ISAQB_HOME/extensions}
 
 [ -f "$REPO_ROOT/build.config" ]          && . "$REPO_ROOT/build.config"
 [ -f "$ISAQB_HOME/build.config.default" ] && . "$ISAQB_HOME/build.config.default"
+
+# Remove build outputs. No config required.
+#   build.sh clean
+if [ "${1:-}" = "clean" ]; then
+  rm -rf "$REPO_ROOT/build"
+  echo "cleaned build/"
+  exit 0
+fi
 
 : "${CURRICULUM_FILE:?not set — set it in build.config or pass -e CURRICULUM_FILE=<docs/ AsciiDoc root, no .adoc>}"
 LANGUAGES=${LANGUAGES:-"DE EN"}
