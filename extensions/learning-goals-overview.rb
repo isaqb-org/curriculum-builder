@@ -67,15 +67,15 @@ module ISAQB
       input.gsub('[', '&#91;').gsub(']', '&#93;')
     end
 
+    # Learning goals are sections; sections only ever nest inside sections, never inside
+    # dlists/lists/tables (whose #blocks yield Arrays, not Blocks). Recurse sections only.
     def find_learning_goals block
-      return [] unless block
+      return [] unless block.respond_to?(:context) && block.context == :section
 
       result = []
-      if block.context == :section
-        id = block.id
-        result << block if id && (id.start_with?('LG') || id.start_with?('LZ'))
-      end
-      block.blocks.each { |child| result.concat find_learning_goals child } if block.blocks
+      id = block.id
+      result << block if id && (id.start_with?('LG') || id.start_with?('LZ'))
+      block.blocks.each { |child| result.concat find_learning_goals child }
       result
     end
   end
