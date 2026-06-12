@@ -73,6 +73,9 @@ The few per-curriculum keys (the native equivalent of the old `build.gradle` `ex
 | `LANGUAGES`       | Space-separated languages to build                             | `DE EN`              |
 | `SUFFIX_TAGS`     | Space-separated extra variants exposed as `{suffix}`           | (empty)              |
 | `PREPRESS`        | PDF print/book layout (recto starts + binding margins)         | `false`              |
+| `ASCIIDOCTOR_COMMON_OPTS` | Extra CLI flags passed to both `asciidoctor` and `asciidoctor-pdf` (e.g. `--trace`) | (empty) |
+| `ASCIIDOCTOR_PDF_OPTS`    | Extra CLI flags passed to `asciidoctor-pdf` only               | (empty)              |
+| `ASCIIDOCTOR_HTML_OPTS`   | Extra CLI flags passed to `asciidoctor` (HTML) only            | (empty)              |
 
 Precedence (highest first): `docker run -e` environment > repo `build.config` > baked default.
 CI sets the version separately via `RELEASE_VERSION`.

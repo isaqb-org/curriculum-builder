@@ -27,6 +27,9 @@ LANGUAGES=${LANGUAGES:-"DE EN"}
 SUFFIX_TAGS=${SUFFIX_TAGS:-""}
 PREPRESS=${PREPRESS:-false}
 VALID_FROM=${VALID_FROM:-""}
+ASCIIDOCTOR_COMMON_OPTS=${ASCIIDOCTOR_COMMON_OPTS:-""}
+ASCIIDOCTOR_PDF_OPTS=${ASCIIDOCTOR_PDF_OPTS:-""}
+ASCIIDOCTOR_HTML_OPTS=${ASCIIDOCTOR_HTML_OPTS:-""}
 VERSION=${RELEASE_VERSION:-LocalBuild}
 VERSION_DATE=$(date +%Y%m%d)
 
@@ -102,6 +105,7 @@ render() {
       -a pdf-fontsdir="$PDF_FONTS_DIR" \
       -a "document-version=$docver"
     [ "$PREPRESS" = "true" ] && set -- "$@" -a prepress
+    set -- "$@" $ASCIIDOCTOR_COMMON_OPTS $ASCIIDOCTOR_PDF_OPTS
     asciidoctor-pdf -r "$PAGE_NUMBERING_RB" -r "$LG_OVERVIEW_RB" \
       --base-dir "$DOCS" -D "$OUT" "$@" "$DOCS/${CURRICULUM_FILE}.adoc"
     mv "$OUT/${CURRICULUM_FILE}.pdf" "$OUT/${CURRICULUM_FILE}${suffix_part}-${lang_lc}.pdf"
@@ -109,6 +113,7 @@ render() {
     set -- $(common_attrs "$lang" "$suffix") \
       -a stylesheet="$HTML_CSS" \
       -a "document-version=$docver"
+    set -- "$@" $ASCIIDOCTOR_COMMON_OPTS $ASCIIDOCTOR_HTML_OPTS
     asciidoctor -r "$LG_OVERVIEW_RB" \
       --base-dir "$DOCS" -D "$OUT" "$@" \
       "$DOCS/index.adoc" "$DOCS/${CURRICULUM_FILE}.adoc"
