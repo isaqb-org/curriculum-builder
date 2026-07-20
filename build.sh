@@ -124,7 +124,7 @@ render() {
     }
     set -- $(common_attrs "$lang" "$suffix") \
       -a linkcss \
-      -a stylesdir=css \
+      -a stylesdir=html-theme \
       -a stylesheet="$(basename "$HTML_CSS")" \
       -a copycss="$HTML_CSS" \
       -a "document-version=$docver"
