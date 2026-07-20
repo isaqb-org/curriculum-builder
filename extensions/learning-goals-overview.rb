@@ -13,7 +13,7 @@ module ISAQB
       learning_goals = document.blocks.flat_map { |block| find_learning_goals block }
       return document if learning_goals.empty?
 
-      learning_goals.sort_by!(&:id)
+      learning_goals.sort_by! { |block| [block.id.scan(/\d+/).map(&:to_i), block.id] }
 
       overview = create_section document, section_title, {}, level: 1
       # Treeprocessor-created sections skip auto id generation; set one so xrefs resolve.
