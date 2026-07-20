@@ -41,7 +41,7 @@ OUT="$REPO_ROOT/build"
 PDF_THEME_DIR=${PDF_THEME_DIR:-$ISAQB_HOME/pdf-theme/themes}
 PDF_FONTS_DIR=${PDF_FONTS_DIR:-$ISAQB_HOME/pdf-theme/fonts}
 HTML_THEME_DIR=${HTML_THEME_DIR:-$ISAQB_HOME/html-theme}
-HTML_CSS=${HTML_CSS:-$HTML_THEME_DIR/adoc-github.css}
+HTML_CSS=${HTML_CSS:-$HTML_THEME_DIR/isaqb-theme.css}
 
 PAGE_NUMBERING_RB="$EXT_DIR/robust-page-numbering.rb"
 LG_OVERVIEW_RB="$EXT_DIR/learning-goals-overview.rb"
@@ -121,6 +121,14 @@ render() {
     [ -d "$OUT/html-theme/images" ] || [ ! -d "$HTML_THEME_DIR/images" ] || {
       mkdir -p "$OUT/html-theme"
       cp -r "$HTML_THEME_DIR/images" "$OUT/html-theme/"
+    }
+    [ -d "$OUT/html-theme/fonts" ] || [ ! -d "$HTML_THEME_DIR/fonts" ] || {
+      mkdir -p "$OUT/html-theme"
+      cp -r "$HTML_THEME_DIR/fonts" "$OUT/html-theme/"
+    }
+    [ -f "$OUT/html-theme/isaqb-theme.js" ] || [ ! -f "$HTML_THEME_DIR/isaqb-theme.js" ] || {
+      mkdir -p "$OUT/html-theme"
+      cp "$HTML_THEME_DIR/isaqb-theme.js" "$OUT/html-theme/"
     }
     set -- $(common_attrs "$lang" "$suffix") \
       -a linkcss \
