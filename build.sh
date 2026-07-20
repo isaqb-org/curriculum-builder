@@ -118,10 +118,6 @@ render() {
       --base-dir "$DOCS" -D "$OUT" "$@" "$DOCS/${CURRICULUM_FILE}.adoc"
     mv "$OUT/${CURRICULUM_FILE}.pdf" "$OUT/${CURRICULUM_FILE}${suffix_part}-${lang_lc}.pdf"
   else
-    [ -d "$OUT/html-theme/images" ] || [ ! -d "$HTML_THEME_DIR/images" ] || {
-      mkdir -p "$OUT/html-theme"
-      cp -r "$HTML_THEME_DIR/images" "$OUT/html-theme/"
-    }
     [ -d "$OUT/html-theme/fonts" ] || [ ! -d "$HTML_THEME_DIR/fonts" ] || {
       mkdir -p "$OUT/html-theme"
       cp -r "$HTML_THEME_DIR/fonts" "$OUT/html-theme/"
@@ -130,11 +126,16 @@ render() {
       mkdir -p "$OUT/html-theme"
       cp "$HTML_THEME_DIR/isaqb-theme.js" "$OUT/html-theme/"
     }
+    [ -f "$OUT/html-theme/favicon.png" ] || [ ! -f "$HTML_THEME_DIR/favicon.png" ] || {
+      mkdir -p "$OUT/html-theme"
+      cp "$HTML_THEME_DIR/favicon.png" "$OUT/html-theme/"
+    }
     set -- $(common_attrs "$lang" "$suffix") \
       -a linkcss \
       -a stylesdir=html-theme \
       -a stylesheet="$(basename "$HTML_CSS")" \
       -a copycss="$HTML_CSS" \
+      -a favicon=html-theme/favicon.png \
       -a "document-version=$docver"
     # shellcheck disable=SC2086 # intentional word-splitting: *_OPTS may hold multiple CLI flags
     set -- "$@" $ASCIIDOCTOR_COMMON_OPTS $ASCIIDOCTOR_HTML_OPTS
