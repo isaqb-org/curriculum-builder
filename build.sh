@@ -40,7 +40,8 @@ OUT="$REPO_ROOT/build"
 
 PDF_THEME_DIR=${PDF_THEME_DIR:-$ISAQB_HOME/pdf-theme/themes}
 PDF_FONTS_DIR=${PDF_FONTS_DIR:-$ISAQB_HOME/pdf-theme/fonts}
-HTML_CSS=${HTML_CSS:-$ISAQB_HOME/html-theme/adoc-github.css}
+HTML_THEME_DIR=${HTML_THEME_DIR:-$ISAQB_HOME/html-theme}
+HTML_CSS=${HTML_CSS:-$HTML_THEME_DIR/adoc-github.css}
 
 PAGE_NUMBERING_RB="$EXT_DIR/robust-page-numbering.rb"
 LG_OVERVIEW_RB="$EXT_DIR/learning-goals-overview.rb"
@@ -117,8 +118,15 @@ render() {
       --base-dir "$DOCS" -D "$OUT" "$@" "$DOCS/${CURRICULUM_FILE}.adoc"
     mv "$OUT/${CURRICULUM_FILE}.pdf" "$OUT/${CURRICULUM_FILE}${suffix_part}-${lang_lc}.pdf"
   else
+    [ -d "$OUT/html-theme/images" ] || [ ! -d "$HTML_THEME_DIR/images" ] || {
+      mkdir -p "$OUT/html-theme"
+      cp -r "$HTML_THEME_DIR/images" "$OUT/html-theme/"
+    }
     set -- $(common_attrs "$lang" "$suffix") \
-      -a stylesheet="$HTML_CSS" \
+      -a linkcss \
+      -a stylesdir=css \
+      -a stylesheet="$(basename "$HTML_CSS")" \
+      -a copycss="$HTML_CSS" \
       -a "document-version=$docver"
     # shellcheck disable=SC2086 # intentional word-splitting: *_OPTS may hold multiple CLI flags
     set -- "$@" $ASCIIDOCTOR_COMMON_OPTS $ASCIIDOCTOR_HTML_OPTS
