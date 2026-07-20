@@ -136,6 +136,8 @@ render() {
       -a stylesheet="$(basename "$HTML_CSS")" \
       -a copycss="$HTML_CSS" \
       -a favicon=html-theme/favicon.png \
+      -a docinfodir="$HTML_THEME_DIR" \
+      -a docinfo=shared \
       -a "document-version=$docver"
     # shellcheck disable=SC2086 # intentional word-splitting: *_OPTS may hold multiple CLI flags
     set -- "$@" $ASCIIDOCTOR_COMMON_OPTS $ASCIIDOCTOR_HTML_OPTS
