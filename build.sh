@@ -11,7 +11,9 @@ REPO_ROOT=${REPO_ROOT:-/project}
 ISAQB_HOME=${ISAQB_HOME:-/opt/isaqb}
 EXT_DIR=${EXT_DIR:-$ISAQB_HOME/extensions}
 
+# shellcheck disable=SC1091
 [ -f "$REPO_ROOT/build.config" ]          && . "$REPO_ROOT/build.config"
+# shellcheck disable=SC1091
 [ -f "$ISAQB_HOME/build.config.default" ] && . "$ISAQB_HOME/build.config.default"
 
 # Remove build outputs. No config required.
@@ -62,11 +64,15 @@ format_validity() {
   { [ "$vf_mnum" -ge 1 ] && [ "$vf_mnum" -le 12 ]; } 2>/dev/null || return 0
   if [ "$vf_lang" = "DE" ]; then
     set -- Januar Februar März April Mai Juni Juli August September Oktober November Dezember
-    eval vf_mname=\${$vf_mnum}
+    # shellcheck disable=SC1083 # deferred ${N} expansion via eval, not a literal brace
+    eval vf_mname=\${"$vf_mnum"}
+    # shellcheck disable=SC2154 # vf_mname assigned indirectly via eval above
     printf '%s' " (Gültig ab ${vf_day}. ${vf_mname} ${vf_year})"
   else
     set -- January February March April May June July August September October November December
-    eval vf_mname=\${$vf_mnum}
+    # shellcheck disable=SC1083 # deferred ${N} expansion via eval, not a literal brace
+    eval vf_mname=\${"$vf_mnum"}
+    # shellcheck disable=SC2154 # vf_mname assigned indirectly via eval above
     printf '%s' " (valid from ${vf_mname} ${vf_day}, ${vf_year})"
   fi
 }
@@ -105,6 +111,7 @@ render() {
       -a pdf-fontsdir="$PDF_FONTS_DIR" \
       -a "document-version=$docver"
     [ "$PREPRESS" = "true" ] && set -- "$@" -a prepress
+    # shellcheck disable=SC2086 # intentional word-splitting: *_OPTS may hold multiple CLI flags
     set -- "$@" $ASCIIDOCTOR_COMMON_OPTS $ASCIIDOCTOR_PDF_OPTS
     asciidoctor-pdf -r "$PAGE_NUMBERING_RB" -r "$LG_OVERVIEW_RB" \
       --base-dir "$DOCS" -D "$OUT" "$@" "$DOCS/${CURRICULUM_FILE}.adoc"
@@ -113,6 +120,7 @@ render() {
     set -- $(common_attrs "$lang" "$suffix") \
       -a stylesheet="$HTML_CSS" \
       -a "document-version=$docver"
+    # shellcheck disable=SC2086 # intentional word-splitting: *_OPTS may hold multiple CLI flags
     set -- "$@" $ASCIIDOCTOR_COMMON_OPTS $ASCIIDOCTOR_HTML_OPTS
     asciidoctor -r "$LG_OVERVIEW_RB" \
       --base-dir "$DOCS" -D "$OUT" "$@" \
