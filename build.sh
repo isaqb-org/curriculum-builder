@@ -41,6 +41,7 @@ OUT="$REPO_ROOT/build"
 PDF_THEME_DIR=${PDF_THEME_DIR:-$ISAQB_HOME/pdf-theme/themes}
 PDF_FONTS_DIR=${PDF_FONTS_DIR:-$ISAQB_HOME/pdf-theme/fonts}
 HTML_THEME_DIR=${HTML_THEME_DIR:-$ISAQB_HOME/html-theme}
+HTML_THEME_OUT_DIR=$(basename "$HTML_THEME_DIR")
 HTML_CSS=${HTML_CSS:-$HTML_THEME_DIR/isaqb-theme.css}
 
 PAGE_NUMBERING_RB="$EXT_DIR/robust-page-numbering.rb"
@@ -118,24 +119,24 @@ render() {
       --base-dir "$DOCS" -D "$OUT" "$@" "$DOCS/${CURRICULUM_FILE}.adoc"
     mv "$OUT/${CURRICULUM_FILE}.pdf" "$OUT/${CURRICULUM_FILE}${suffix_part}-${lang_lc}.pdf"
   else
-    [ -d "$OUT/html-theme/fonts" ] || [ ! -d "$HTML_THEME_DIR/fonts" ] || {
-      mkdir -p "$OUT/html-theme"
-      cp -r "$HTML_THEME_DIR/fonts" "$OUT/html-theme/"
+    [ -d "$OUT/$HTML_THEME_OUT_DIR/fonts" ] || [ ! -d "$HTML_THEME_DIR/fonts" ] || {
+      mkdir -p "$OUT/$HTML_THEME_OUT_DIR"
+      cp -r "$HTML_THEME_DIR/fonts" "$OUT/$HTML_THEME_OUT_DIR/"
     }
-    [ -f "$OUT/html-theme/isaqb-theme.js" ] || [ ! -f "$HTML_THEME_DIR/isaqb-theme.js" ] || {
-      mkdir -p "$OUT/html-theme"
-      cp "$HTML_THEME_DIR/isaqb-theme.js" "$OUT/html-theme/"
+    [ -f "$OUT/$HTML_THEME_OUT_DIR/isaqb-theme.js" ] || [ ! -f "$HTML_THEME_DIR/isaqb-theme.js" ] || {
+      mkdir -p "$OUT/$HTML_THEME_OUT_DIR"
+      cp "$HTML_THEME_DIR/isaqb-theme.js" "$OUT/$HTML_THEME_OUT_DIR/"
     }
-    [ -f "$OUT/html-theme/favicon.png" ] || [ ! -f "$HTML_THEME_DIR/favicon.png" ] || {
-      mkdir -p "$OUT/html-theme"
-      cp "$HTML_THEME_DIR/favicon.png" "$OUT/html-theme/"
+    [ -f "$OUT/$HTML_THEME_OUT_DIR/favicon.png" ] || [ ! -f "$HTML_THEME_DIR/favicon.png" ] || {
+      mkdir -p "$OUT/$HTML_THEME_OUT_DIR"
+      cp "$HTML_THEME_DIR/favicon.png" "$OUT/$HTML_THEME_OUT_DIR/"
     }
     set -- $(common_attrs "$lang" "$suffix") \
       -a linkcss \
-      -a stylesdir=html-theme \
+      -a stylesdir="$HTML_THEME_OUT_DIR" \
       -a stylesheet="$(basename "$HTML_CSS")" \
       -a copycss="$HTML_CSS" \
-      -a favicon=html-theme/favicon.png \
+      -a favicon="$HTML_THEME_OUT_DIR/favicon.png" \
       -a docinfodir="$HTML_THEME_DIR" \
       -a docinfo=shared \
       -a "document-version=$docver"
