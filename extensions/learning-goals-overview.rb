@@ -47,10 +47,12 @@ module ISAQB
 
     private
 
-    # Turn the converted title's HTML sup/sub + entities back into AsciiDoc inline markup.
+    # Turn the converted title's HTML sup/sub/em/strong + entities back into AsciiDoc inline markup.
     def clean_title_for_xref title
       title = title.gsub(%r{<sup>(.*?)</sup>}, '^\1^')
       title = title.gsub(%r{<sub>(.*?)</sub>}, '~\1~')
+      title = title.gsub(%r{<strong>(.*?)</strong>}, '*\1*')
+      title = title.gsub(%r{<em>(.*?)</em>}, '_\1_')
       title = unescape_html_entities title
       escape_for_xref title
     end
