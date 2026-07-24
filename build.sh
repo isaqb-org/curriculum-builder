@@ -91,7 +91,6 @@ common_attrs() {
      -a release-version=${VERSION} \
      -a language=${lang} \
      -a curriculumFileName=${CURRICULUM_FILE} \
-     -a data-uri \
      -a allow-uri-read \
      -a include-configuration=tags=**;${lang};!* \
      -a suffix=${suffix}"
