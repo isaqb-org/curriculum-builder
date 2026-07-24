@@ -131,6 +131,12 @@ render() {
       mkdir -p "$OUT/$HTML_THEME_OUT_DIR"
       cp "$HTML_THEME_DIR/favicon.png" "$OUT/$HTML_THEME_OUT_DIR/"
     }
+
+    [ -d "$OUT/images" ] || [ ! -d "$DOCS/images" ] || {
+      mkdir -p "$OUT/images"
+      cp -r "$DOCS/images/." "$OUT/images/"
+    }
+
     set -- $(common_attrs "$lang" "$suffix") \
       -a linkcss \
       -a stylesdir="$HTML_THEME_OUT_DIR" \
