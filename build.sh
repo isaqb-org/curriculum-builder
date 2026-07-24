@@ -5,8 +5,7 @@
 #   build.sh pdf DE REMARKS  # + suffix tag
 #   build.sh clean           # remove build/ outputs
 # Config precedence: environment > repo build.config > baked default.
-set errexit
-set nounset
+set -eu
 
 REPO_ROOT=${REPO_ROOT:-/project}
 ISAQB_HOME=${ISAQB_HOME:-/opt/isaqb}
