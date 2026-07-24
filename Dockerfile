@@ -11,7 +11,7 @@ ARG PDF_THEME_REPO=https://github.com/isaqb-org/pdf-theme
 ARG PDF_THEME_REF=ccf2db3f350e3f254d9807bd80b8611617221f0b
 ARG HTML_THEME_REPO=https://github.com/isaqb-org/html-theme
 # renovate: currentValue=main
-ARG HTML_THEME_REF=518eba0cc3ef177f3e6f8e69532be7171bfdeefc
+ARG HTML_THEME_REF=c93cd7debbe4c9116a379394229105ef5a65f0b7
 
 RUN apk add --no-cache build-base git \
  && gem install --no-document asciidoctor:2.0.26 asciidoctor-pdf:2.3.24 \
