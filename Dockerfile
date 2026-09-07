@@ -14,7 +14,7 @@ ARG HTML_THEME_REPO=https://github.com/isaqb-org/html-theme
 ARG HTML_THEME_REF=c93cd7debbe4c9116a379394229105ef5a65f0b7
 
 RUN apk add --no-cache build-base git \
- && gem install --no-document asciidoctor:2.0.26 asciidoctor-pdf:2.3.24 \
+ && gem install --no-document asciidoctor:2.0.26 asciidoctor-pdf:2.3.27 \
  && for d in "pdf-theme:$PDF_THEME_REPO:$PDF_THEME_REF" "html-theme:$HTML_THEME_REPO:$HTML_THEME_REF"; do \
       name="${d%%:*}"; rest="${d#*:}"; repo="${rest%:*}"; ref="${rest##*:}"; \
       git init "/opt/isaqb/$name" \
