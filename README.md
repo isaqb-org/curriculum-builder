@@ -101,6 +101,9 @@ How AsciiDoc maps to Markdown:
 
 - **No HTML**: the output is plain Markdown, so it reads the same in every viewer (GitHub, VS Code,
   Xcode, …) and for AI agents.
+- **Metadata** for tools and agents is written as YAML front matter at the top: title, publisher,
+  language, version, date, `valid-from` (if `VALID_FROM` is set), the matching PDF (if PDFs are
+  built), a license note and a note that the file is generated. Fields without a value are omitted.
 - **Headings** carry the section numbers of the PDF.
 - **Links to websites** stay links. **Cross references** within the document become plain text,
   e.g. "LG 01-02: …" or "[Bass+2021]"; there are no anchors.

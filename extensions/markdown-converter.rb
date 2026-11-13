@@ -45,12 +45,9 @@ module ISAQB
     # ---------------------------------------------------------------- document structure
 
     def convert_document node
-      parts = []
+      parts = [front_matter(node)]
       if node.header? && !node.notitle && (title = node.doctitle)
         parts << "# #{heading_text title}"
-      end
-      if (version = node.attr 'document-version')
-        parts << "Version: #{prose version}"
       end
       parts << blocks(node)
       parts << footnotes(node)
@@ -321,6 +318,50 @@ module ISAQB
       "#{text.gsub(/\n{3,}/, "\n\n").strip}\n"
     end
 
+    # YAML front matter with metadata for tools and AI agents. Fields without a value are omitted.
+    # md-pdf-file and md-valid-from are set by build.sh.
+    def front_matter node
+      german = node.attr('language').to_s.upcase == 'DE'
+      copyright = node.catalog[:refs]['copyright']
+      copyright_title = copyright.is_a?(Asciidoctor::Section) ? plain(heading_text(copyright.title)) : nil
+
+      license =
+        if copyright_title
+          german ? "Die Nutzung unterliegt den Bedingungen im Abschnitt '#{copyright_title}'." : "Use is subject to the conditions in the section '#{copyright_title}'."
+        end
+      generated =
+        if german
+          'Aus den AsciiDoc-Quellen des Lehrplans generiert. Inhaltlich identisch mit der PDF- und HTML-Version.'
+        else
+          'Generated from the AsciiDoc sources of the curriculum. Same content as the PDF and HTML versions.'
+        end
+
+      fields = {
+        'title' => (node.doctitle && plain(heading_text(node.doctitle))),
+        'publisher' => 'iSAQB e. V.',
+        'language' => node.attr('language')&.downcase,
+        'version' => node.attr('release-version'),
+        'date' => iso_date(node.attr('revdate')),
+        'valid-from' => node.attr('md-valid-from'),
+        'pdf' => node.attr('md-pdf-file'),
+        'license' => license,
+        'generated' => generated
+      }.reject { |_, v| v.nil? || v.to_s.empty? }
+
+      lines = fields.map { |k, v| %(#{k}: "#{v.to_s.gsub('\\', '\\\\\\\\').gsub('"', '\\"')}") }
+      "---\n#{lines.join "\n"}\n---"
+    end
+
+    # 20261113 -> 2026-11-13; anything else unchanged
+    def iso_date value
+      value.to_s.sub(/\A(\d{4})(\d{2})(\d{2})\z/, '\1-\2-\3')
+    end
+
+    # Text without Markdown markup (for YAML values)
+    def plain text
+      text.delete("#{STAR}#{TICK}").gsub('\<', '<')
+    end
+
     def footnotes node
       notes = node.footnotes
       return '' if notes.empty?
@@ -338,7 +379,7 @@ module ISAQB
     # Headings must be a single line; line breaks (hard breaks, <br> passed through as title break)
     # become a space.
     def heading_text title
-      one_line(prose(title).gsub(/\s*(<br\s*\/?>|#{BREAK})\s*/o, ' ')).strip
+      one_line(prose(title).gsub(/(?:\s*(?:<br\s*\/?>|#{BREAK})\s*)+/o, ' ')).strip
     end
 
     def with_title node, body

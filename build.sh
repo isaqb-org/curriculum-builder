@@ -135,8 +135,13 @@ render() {
     mv "$OUT/${CURRICULUM_FILE}.pdf" "$OUT/${CURRICULUM_FILE}${suffix_part}-${lang_lc}.pdf"
   elif [ "$format" = "md" ]; then
     copy_images
-    set -- $(common_attrs "$lang" "$suffix") \
-      -a "document-version=$docver"
+    set -- $(common_attrs "$lang" "$suffix")
+    # Metadata for the front matter: the PDF of the same language (only if PDFs are built) and
+    # the validity date (only if VALID_FROM is a valid YYYY/MM/DD date).
+    case " $FORMATS " in
+      *" pdf "*) set -- "$@" -a "md-pdf-file=${CURRICULUM_FILE}${suffix_part}-${lang_lc}.pdf" ;;
+    esac
+    [ -n "$(format_validity "$lang")" ] && set -- "$@" -a "md-valid-from=$(echo "$VALID_FROM" | tr / -)"
     # shellcheck disable=SC2086 # intentional word-splitting: *_OPTS may hold multiple CLI flags
     set -- "$@" $ASCIIDOCTOR_COMMON_OPTS $ASCIIDOCTOR_MD_OPTS
     asciidoctor -r "$MARKDOWN_RB" -r "$LG_OVERVIEW_RB" -b markdown \
