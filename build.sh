@@ -3,6 +3,7 @@
 #   build.sh                 # all languages x formats
 #   build.sh pdf DE          # single format + language
 #   build.sh pdf DE REMARKS  # + suffix tag
+#   build.sh md EN           # Markdown (format: pdf | html | md)
 #   build.sh clean           # remove build/ outputs
 # Config precedence: environment > repo build.config > baked default.
 set -eu
@@ -28,10 +29,12 @@ fi
 LANGUAGES=${LANGUAGES:-"DE EN"}
 SUFFIX_TAGS=${SUFFIX_TAGS:-""}
 PREPRESS=${PREPRESS:-false}
+FORMATS=${FORMATS:-"pdf html"}
 VALID_FROM=${VALID_FROM:-""}
 ASCIIDOCTOR_COMMON_OPTS=${ASCIIDOCTOR_COMMON_OPTS:-""}
 ASCIIDOCTOR_PDF_OPTS=${ASCIIDOCTOR_PDF_OPTS:-""}
 ASCIIDOCTOR_HTML_OPTS=${ASCIIDOCTOR_HTML_OPTS:-""}
+ASCIIDOCTOR_MD_OPTS=${ASCIIDOCTOR_MD_OPTS:-""}
 VERSION=${RELEASE_VERSION:-LocalBuild}
 VERSION_DATE=$(date +%Y%m%d)
 
@@ -46,6 +49,7 @@ HTML_CSS=${HTML_CSS:-$HTML_THEME_DIR/isaqb-theme.css}
 
 PAGE_NUMBERING_RB="$EXT_DIR/robust-page-numbering.rb"
 LG_OVERVIEW_RB="$EXT_DIR/learning-goals-overview.rb"
+MARKDOWN_RB="$EXT_DIR/markdown-converter.rb"
 
 mkdir -p "$OUT"
 
@@ -96,8 +100,20 @@ common_attrs() {
      -a suffix=${suffix}"
 }
 
+# Copy docs/images to build/images once (referenced relatively by HTML and Markdown).
+copy_images() {
+  [ -d "$OUT/images" ] || [ ! -d "$DOCS/images" ] || {
+    mkdir -p "$OUT/images"
+    cp -r "$DOCS/images/." "$OUT/images/"
+  }
+}
+
 render() {
   format=$1; lang=$2; suffix=$3
+  case "$format" in
+    pdf|html|md) ;;
+    *) echo "unknown format '$format' (expected: pdf, html, md)" >&2; exit 1 ;;
+  esac
   suffix_part=""
   [ -n "$suffix" ] && suffix_part="-$(echo "$suffix" | tr '[:upper:]' '[:lower:]')"
   lang_lc=$(echo "$lang" | tr '[:upper:]' '[:lower:]')
@@ -117,6 +133,15 @@ render() {
     asciidoctor-pdf -r "$PAGE_NUMBERING_RB" -r "$LG_OVERVIEW_RB" \
       --base-dir "$DOCS" -D "$OUT" "$@" "$DOCS/${CURRICULUM_FILE}.adoc"
     mv "$OUT/${CURRICULUM_FILE}.pdf" "$OUT/${CURRICULUM_FILE}${suffix_part}-${lang_lc}.pdf"
+  elif [ "$format" = "md" ]; then
+    copy_images
+    set -- $(common_attrs "$lang" "$suffix") \
+      -a "document-version=$docver"
+    # shellcheck disable=SC2086 # intentional word-splitting: *_OPTS may hold multiple CLI flags
+    set -- "$@" $ASCIIDOCTOR_COMMON_OPTS $ASCIIDOCTOR_MD_OPTS
+    asciidoctor -r "$MARKDOWN_RB" -r "$LG_OVERVIEW_RB" -b markdown \
+      --base-dir "$DOCS" -D "$OUT" "$@" "$DOCS/${CURRICULUM_FILE}.adoc"
+    mv "$OUT/${CURRICULUM_FILE}.md" "$OUT/${CURRICULUM_FILE}${suffix_part}-${lang_lc}.md"
   else
     [ -d "$OUT/$HTML_THEME_OUT_DIR/fonts" ] || [ ! -d "$HTML_THEME_DIR/fonts" ] || {
       mkdir -p "$OUT/$HTML_THEME_OUT_DIR"
@@ -131,10 +156,7 @@ render() {
       cp "$HTML_THEME_DIR/favicon.png" "$OUT/$HTML_THEME_OUT_DIR/"
     }
 
-    [ -d "$OUT/images" ] || [ ! -d "$DOCS/images" ] || {
-      mkdir -p "$OUT/images"
-      cp -r "$DOCS/images/." "$OUT/images/"
-    }
+    copy_images
 
     set -- $(common_attrs "$lang" "$suffix") \
       -a linkcss \
@@ -160,7 +182,7 @@ if [ "$#" -ge 2 ]; then
   exit 0
 fi
 
-for fmt in pdf html; do
+for fmt in $FORMATS; do
   for lang in $LANGUAGES; do
     if [ -z "$SUFFIX_TAGS" ]; then
       echo "[$fmt $lang]"; render "$fmt" "$lang" ""
