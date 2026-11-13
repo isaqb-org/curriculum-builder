@@ -1,7 +1,7 @@
 # iSAQB curriculum builder (Ruby toolchain)
 
-A self-contained, native-Ruby toolchain for rendering iSAQB Advanced Level curricula to PDF
-and HTML. It replaces the JVM/Gradle (`asciidoctorj`) build with native MRI `asciidoctor` +
+A self-contained, native-Ruby toolchain for rendering iSAQB Advanced Level curricula to PDF,
+HTML and (optionally) Markdown. It replaces the JVM/Gradle (`asciidoctorj`) build with native MRI `asciidoctor` +
 `asciidoctor-pdf` — significantly faster, and a single pinned Docker image instead of a JDK,
 Gradle, and theme submodules in every curriculum repo.
 
@@ -18,16 +18,19 @@ that image and need nothing else installed locally.
 - **`asciidoctor` + `asciidoctor-pdf`** — pinned to explicit versions in the `Dockerfile`;
   Renovate keeps them current. No source highlighter is bundled (the curriculum sets no
   `:source-highlighter:`).
-- **`extensions/`** — the two render extensions, baked into `/opt/isaqb/extensions`:
+- **`extensions/`** — the render extensions and the Markdown converter, baked into `/opt/isaqb/extensions`:
   - `learning-goals-overview.rb` — builds the "Learning Goals Overview" section and tags the
     first chapter `arabic-start`. Ruby port of the legacy `SpecialTocTreeprocessor.groovy`,
     verified functionally equivalent.
   - `robust-page-numbering.rb` — roman front matter up to the first chapter, arabic after. It
     reads the `arabic-start` role set by the treeprocessor, so the two extensions must stay
     in sync.
+  - `markdown-converter.rb` — an Asciidoctor converter (backend `markdown`) that writes GitHub
+    Flavored Markdown. See [Markdown output](#markdown-output).
 - **`pdf-theme` and `html-theme`** — cloned from their `main` branch into `/opt/isaqb`, so
   curriculum repos no longer need the theme submodules.
 - **`build.sh`** — the render matrix (format × language × suffix); the in-image `ENTRYPOINT`.
+  Formats: `pdf`, `html`, `md`.
 - **`build.config`** — baked as the default config; a curriculum's own `build.config` overrides it.
 
 The image is built for both `linux/amd64` and `linux/arm64`, so it runs natively on Intel/AMD
@@ -72,13 +75,42 @@ The few per-curriculum keys (the native equivalent of the old `build.gradle` `ex
 | `CURRICULUM_FILE` | AsciiDoc root in `docs/` (no `.adoc`); also the output name     | **required** (build fails if unset) |
 | `LANGUAGES`       | Space-separated languages to build                             | `DE EN`              |
 | `SUFFIX_TAGS`     | Space-separated extra variants exposed as `{suffix}`           | (empty)              |
+| `FORMATS`         | Space-separated output formats: `pdf`, `html`, `md`            | `pdf html`           |
 | `PREPRESS`        | PDF print/book layout (recto starts + binding margins)         | `false`              |
 | `ASCIIDOCTOR_COMMON_OPTS` | Extra CLI flags passed to both `asciidoctor` and `asciidoctor-pdf` (e.g. `--trace`) | (empty) |
 | `ASCIIDOCTOR_PDF_OPTS`    | Extra CLI flags passed to `asciidoctor-pdf` only               | (empty)              |
 | `ASCIIDOCTOR_HTML_OPTS`   | Extra CLI flags passed to `asciidoctor` (HTML) only            | (empty)              |
+| `ASCIIDOCTOR_MD_OPTS`     | Extra CLI flags passed to `asciidoctor` (Markdown) only        | (empty)              |
 
 Precedence (highest first): `docker run -e` environment > repo `build.config` > baked default.
 CI sets the version separately via `RELEASE_VERSION`.
+
+### Markdown output
+
+Set `FORMATS="pdf html md"` in a curriculum's `build.config` (or run `build.sh md EN`) to also
+produce `build/<CURRICULUM_FILE>-<lang>.md`, e.g. for use with AI agents. Images are copied to
+`build/images/` and referenced relatively, as for HTML.
+
+The Markdown is produced by `extensions/markdown-converter.rb`, a converter for Asciidoctor
+itself: Asciidoctor parses the curriculum as usual (includes, language tags, conditionals,
+attributes, the learning-goals overview), so the Markdown has the same content as the PDF and
+HTML. Tools that convert AsciiDoc text directly (`downdoc`) or go via DocBook/HTML and pandoc
+were evaluated and lose content (includes, bibliography, anchors) or produce raw HTML noise.
+
+How AsciiDoc maps to Markdown:
+
+- **No HTML**: the output is plain Markdown, so it reads the same in every viewer (GitHub, VS Code,
+  Xcode, …) and for AI agents.
+- **Headings** carry the section numbers of the PDF.
+- **Links to websites** stay links. **Cross references** within the document become plain text,
+  e.g. "LG 01-02: …" or "[Bass+2021]"; there are no anchors.
+- **Tables** become GFM tables. Tables without a header row get an empty one (GFM requires a
+  header); multi-line cell content is joined with "; ".
+- **Admonitions** become GitHub alerts (`> [!NOTE]`), **sidebars** and **quotes** blockquotes.
+- **Paragraphs and list items** are written on a single line; hard line breaks become Markdown
+  line breaks (two trailing spaces).
+- **Superscript/subscript** use Unicode where possible (x², CO₂), otherwise plain text (®).
+- **Page breaks** and `toc::[]` are omitted; the title break becomes a space.
 
 ### Pinning the image
 
@@ -142,5 +174,9 @@ step or investigating a rendering regression after a gem bump:
 2. Roman page numbers on copyright/TOC/overview, switching to arabic at the first chapter.
 3. PDF outline/bookmarks and in-TOC page numbers match.
 4. Fonts, theme colours, and embedded images render identically.
+
+Markdown has no legacy counterpart. When changing `markdown-converter.rb`, check that the
+output contains no HTML tags and no AsciiDoc syntax (`xref:`, `<<…>>`, `|===`, `{attribute}`)
+outside code spans.
 ```
 
