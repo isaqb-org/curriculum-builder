@@ -4,6 +4,7 @@
 #   build.sh pdf DE          # single format + language
 #   build.sh pdf DE REMARKS  # + suffix tag
 #   build.sh md EN           # Markdown (format: pdf | html | md)
+# A full build with md in FORMATS also writes build/llms.txt.
 #   build.sh clean           # remove build/ outputs
 # Config precedence: environment > repo build.config > baked default.
 set -eu
@@ -108,15 +109,28 @@ copy_images() {
   }
 }
 
+lower() { echo "$1" | tr '[:upper:]' '[:lower:]'; }
+
+# Output file name without extension, e.g. curriculum-remarks-en
+base_name() {
+  printf '%s%s-%s' "$CURRICULUM_FILE" "${2:+-$(lower "$2")}" "$(lower "$1")"
+}
+
+language_name() {
+  case "$1" in
+    DE) echo German ;;
+    EN) echo English ;;
+    *)  echo "$1" ;;
+  esac
+}
+
 render() {
   format=$1; lang=$2; suffix=$3
   case "$format" in
     pdf|html|md) ;;
     *) echo "unknown format '$format' (expected: pdf, html, md)" >&2; exit 1 ;;
   esac
-  suffix_part=""
-  [ -n "$suffix" ] && suffix_part="-$(echo "$suffix" | tr '[:upper:]' '[:lower:]')"
-  lang_lc=$(echo "$lang" | tr '[:upper:]' '[:lower:]')
+  name=$(base_name "$lang" "$suffix")
 
   docver="${VERSION}-${lang}-${VERSION_DATE}$(format_validity "$lang")"
 
@@ -132,21 +146,21 @@ render() {
     set -- "$@" $ASCIIDOCTOR_COMMON_OPTS $ASCIIDOCTOR_PDF_OPTS
     asciidoctor-pdf -r "$PAGE_NUMBERING_RB" -r "$LG_OVERVIEW_RB" \
       --base-dir "$DOCS" -D "$OUT" "$@" "$DOCS/${CURRICULUM_FILE}.adoc"
-    mv "$OUT/${CURRICULUM_FILE}.pdf" "$OUT/${CURRICULUM_FILE}${suffix_part}-${lang_lc}.pdf"
+    mv "$OUT/${CURRICULUM_FILE}.pdf" "$OUT/${name}.pdf"
   elif [ "$format" = "md" ]; then
     copy_images
     set -- $(common_attrs "$lang" "$suffix")
     # Metadata for the front matter: the PDF of the same language (only if PDFs are built) and
     # the validity date (only if VALID_FROM is a valid YYYY/MM/DD date).
     case " $FORMATS " in
-      *" pdf "*) set -- "$@" -a "md-pdf-file=${CURRICULUM_FILE}${suffix_part}-${lang_lc}.pdf" ;;
+      *" pdf "*) set -- "$@" -a "md-pdf-file=${name}.pdf" ;;
     esac
     [ -n "$(format_validity "$lang")" ] && set -- "$@" -a "md-valid-from=$(echo "$VALID_FROM" | tr / -)"
     # shellcheck disable=SC2086 # intentional word-splitting: *_OPTS may hold multiple CLI flags
     set -- "$@" $ASCIIDOCTOR_COMMON_OPTS $ASCIIDOCTOR_MD_OPTS
     asciidoctor -r "$MARKDOWN_RB" -r "$LG_OVERVIEW_RB" -b markdown \
       --base-dir "$DOCS" -D "$OUT" "$@" "$DOCS/${CURRICULUM_FILE}.adoc"
-    mv "$OUT/${CURRICULUM_FILE}.md" "$OUT/${CURRICULUM_FILE}${suffix_part}-${lang_lc}.md"
+    mv "$OUT/${CURRICULUM_FILE}.md" "$OUT/${name}.md"
   else
     [ -d "$OUT/$HTML_THEME_OUT_DIR/fonts" ] || [ ! -d "$HTML_THEME_DIR/fonts" ] || {
       mkdir -p "$OUT/$HTML_THEME_OUT_DIR"
@@ -177,9 +191,59 @@ render() {
     asciidoctor -r "$LG_OVERVIEW_RB" \
       --base-dir "$DOCS" -D "$OUT" "$@" \
       "$DOCS/index.adoc" "$DOCS/${CURRICULUM_FILE}.adoc"
-    mv "$OUT/${CURRICULUM_FILE}.html" "$OUT/${CURRICULUM_FILE}${suffix_part}-${lang_lc}.html"
+    mv "$OUT/${CURRICULUM_FILE}.html" "$OUT/${name}.html"
   fi
-  echo "  -> build/${CURRICULUM_FILE}${suffix_part}-${lang_lc}.${format}"
+  echo "  -> build/${name}.${format}"
+}
+
+# llms.txt (https://llmstxt.org): index of the built files for AI agents. Links are
+# relative, so they work wherever build/ is published (e.g. GitHub Pages subdirectories).
+write_llms_txt() {
+  case " $FORMATS " in *" md "*) ;; *) return 0 ;; esac
+
+  # Every language x suffix variant as "LANG SUFFIX" lines ("-" = no suffix)
+  variants=$(for l in $LANGUAGES; do for s in ${SUFFIX_TAGS:--}; do echo "$l $s"; done; done)
+
+  # Title from the front matter of the English Markdown (or the first one)
+  title_variant=$(echo "$variants" | grep '^EN ' | head -n 1)
+  [ -n "$title_variant" ] || title_variant=$(echo "$variants" | head -n 1)
+  title_name=$(echo "$title_variant" | { read -r l s; [ "$s" = "-" ] && s=""; base_name "$l" "$s"; })
+  title=$(sed -n '/^---$/,/^---$/s/^title: "\(.*\)"$/\1/p' "$OUT/$title_name.md" | head -n 1 \
+    | sed 's/\\"/"/g; s/\\\\/\\/g')
+
+  case "$VERSION" in
+    LocalBuild) kind="Local build" ;;
+    *-RC*)      kind="Release candidate $VERSION" ;;
+    *)          kind="Release $VERSION" ;;
+  esac
+
+  curriculum=$(echo "$variants" | while read -r l s; do
+    [ "$s" = "-" ] && s=""
+    name=$(base_name "$l" "$s")
+    echo "- [$(language_name "$l")${s:+ ($s)}]($name.md): $name.md"
+  done)
+
+  optional=$(for fmt in pdf html; do
+    case " $FORMATS " in *" $fmt "*) ;; *) continue ;; esac
+    echo "$variants" | while read -r l s; do
+      [ "$s" = "-" ] && s=""
+      file="$(base_name "$l" "$s").$fmt"
+      echo "- [$file]($file)"
+    done
+  done)
+  # Section only if PDF or HTML is built
+  [ -z "$optional" ] || optional=$(printf '\n\n## Optional\n\n%s' "$optional")
+
+  cat > "$OUT/llms.txt" <<EOF
+# ${title:-$CURRICULUM_FILE}
+
+> $kind of this iSAQB curriculum. Each Markdown file contains the complete curriculum in one language.
+
+## Curriculum
+
+$curriculum$optional
+EOF
+  echo "  -> build/llms.txt"
 }
 
 if [ "$#" -ge 2 ]; then
@@ -198,3 +262,5 @@ for fmt in $FORMATS; do
     fi
   done
 done
+
+write_llms_txt

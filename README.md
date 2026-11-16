@@ -91,6 +91,12 @@ Set `FORMATS="pdf html md"` in a curriculum's `build.config` (or run `build.sh m
 produce `build/<CURRICULUM_FILE>-<lang>.md`, e.g. for use with AI agents. Images are copied to
 `build/images/` and referenced relatively, as for HTML.
 
+A full build (no positional arguments) with `md` in `FORMATS` also writes `build/llms.txt`
+(see [llmstxt.org](https://llmstxt.org)): the curriculum title, the release version
+(`Release candidate` for `*-RC*` versions) and relative links to the Markdown files, followed by
+the PDF and HTML files under `## Optional`. Relative links keep it valid wherever `build/` is
+published, e.g. in a GitHub Pages subdirectory.
+
 The Markdown is produced by `extensions/markdown-converter.rb`, a converter for Asciidoctor
 itself: Asciidoctor parses the curriculum as usual (includes, language tags, conditionals,
 attributes, the learning-goals overview), so the Markdown has the same content as the PDF and
