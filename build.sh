@@ -193,14 +193,22 @@ render() {
 write_llms_txt() {
   case " $FORMATS " in *" md "*) ;; *) return 0 ;; esac
 
-  # Every language x suffix variant as "LANG SUFFIX" lines ("-" = no suffix)
-  variants=$(for l in $LANGUAGES; do for s in ${SUFFIX_TAGS:--}; do echo "$l $s"; done; done)
+  # Every language x suffix variant as LANG:SUFFIX (suffix may be empty)
+  variants=
+  for lang in $LANGUAGES; do
+    for sfx in ${SUFFIX_TAGS:--}; do
+      [ "$sfx" = "-" ] && sfx=
+      variants="${variants:+$variants }$lang:$sfx"
+    done
+  done
 
-  # Title from the front matter of the English Markdown (or the first one)
-  title_variant=$(echo "$variants" | grep '^EN ' | head -n 1)
-  [ -n "$title_variant" ] || title_variant=$(echo "$variants" | head -n 1)
-  title_name=$(echo "$title_variant" | { read -r l s; [ "$s" = "-" ] && s=""; base_name "$l" "$s"; })
-  title=$(sed -n '/^---$/,/^---$/s/^title: "\(.*\)"$/\1/p' "$OUT/$title_name.md" | head -n 1 \
+  # Title from the front matter of the first English Markdown (or the first one)
+  title_variant=${variants%% *}
+  for v in $variants; do
+    case "$v" in EN:*) title_variant=$v; break ;; esac
+  done
+  title=$(sed -n '/^---$/,/^---$/s/^title: "\(.*\)"$/\1/p' \
+    "$OUT/$(base_name "${title_variant%%:*}" "${title_variant#*:}").md" | head -n 1 \
     | sed 's/\\"/"/g; s/\\\\/\\/g')
 
   case "$VERSION" in
@@ -209,32 +217,27 @@ write_llms_txt() {
     *)          kind="Release $VERSION" ;;
   esac
 
-  curriculum=$(echo "$variants" | while read -r l s; do
-    [ "$s" = "-" ] && s=""
-    name=$(base_name "$l" "$s")
-    echo "- [$l${s:+ ($s)}]($name.md): $name.md"
-  done)
-
-  optional=$(for fmt in pdf html; do
-    case " $FORMATS " in *" $fmt "*) ;; *) continue ;; esac
-    echo "$variants" | while read -r l s; do
-      [ "$s" = "-" ] && s=""
-      file="$(base_name "$l" "$s").$fmt"
-      echo "- [$file]($file)"
+  {
+    printf '# %s\n\n' "${title:-$CURRICULUM_FILE}"
+    printf '> %s of this iSAQB curriculum. Each Markdown file contains the complete curriculum in one language.\n\n' "$kind"
+    printf '## Curriculum\n\n'
+    for v in $variants; do
+      lang=${v%%:*}; sfx=${v#*:}
+      name=$(base_name "$lang" "$sfx")
+      printf -- '- [%s](%s.md): %s.md\n' "$lang${sfx:+ ($sfx)}" "$name" "$name"
     done
-  done)
-  # Section only if PDF or HTML is built
-  [ -z "$optional" ] || optional=$(printf '\n\n## Optional\n\n%s' "$optional")
 
-  cat > "$OUT/llms.txt" <<EOF
-# ${title:-$CURRICULUM_FILE}
-
-> $kind of this iSAQB curriculum. Each Markdown file contains the complete curriculum in one language.
-
-## Curriculum
-
-$curriculum$optional
-EOF
+    # PDF and HTML files, if built
+    optional=
+    for fmt in pdf html; do
+      case " $FORMATS " in *" $fmt "*) ;; *) continue ;; esac
+      [ -n "$optional" ] || { printf '\n## Optional\n\n'; optional=1; }
+      for v in $variants; do
+        file="$(base_name "${v%%:*}" "${v#*:}").$fmt"
+        printf -- '- [%s](%s)\n' "$file" "$file"
+      done
+    done
+  } > "$OUT/llms.txt"
   echo "  -> build/llms.txt"
 }
 
