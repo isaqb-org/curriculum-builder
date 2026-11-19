@@ -116,14 +116,6 @@ base_name() {
   printf '%s%s-%s' "$CURRICULUM_FILE" "${2:+-$(lower "$2")}" "$(lower "$1")"
 }
 
-language_name() {
-  case "$1" in
-    DE) echo German ;;
-    EN) echo English ;;
-    *)  echo "$1" ;;
-  esac
-}
-
 render() {
   format=$1; lang=$2; suffix=$3
   case "$format" in
@@ -220,7 +212,7 @@ write_llms_txt() {
   curriculum=$(echo "$variants" | while read -r l s; do
     [ "$s" = "-" ] && s=""
     name=$(base_name "$l" "$s")
-    echo "- [$(language_name "$l")${s:+ ($s)}]($name.md): $name.md"
+    echo "- [$l${s:+ ($s)}]($name.md): $name.md"
   done)
 
   optional=$(for fmt in pdf html; do
