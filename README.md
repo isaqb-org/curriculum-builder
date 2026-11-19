@@ -47,7 +47,7 @@ not in this repo).
 docker run --rm -u "$(id -u):$(id -g)" \
   -v "$PWD:/project" -w /project \
   -e CURRICULUM_FILE=curriculum-template -e LANGUAGES="DE EN" \
-  ghcr.io/isaqb-org/curriculum-builder:2026              # all languages × pdf+html -> ./build
+  ghcr.io/isaqb-org/curriculum-builder:2026              # all languages × pdf+html+md -> ./build
 ```
 
 Positional arguments select a subset of the matrix:
@@ -75,7 +75,7 @@ The few per-curriculum keys (the native equivalent of the old `build.gradle` `ex
 | `CURRICULUM_FILE` | AsciiDoc root in `docs/` (no `.adoc`); also the output name     | **required** (build fails if unset) |
 | `LANGUAGES`       | Space-separated languages to build                             | `DE EN`              |
 | `SUFFIX_TAGS`     | Space-separated extra variants exposed as `{suffix}`           | (empty)              |
-| `FORMATS`         | Space-separated output formats: `pdf`, `html`, `md`            | `pdf html`           |
+| `FORMATS`         | Space-separated output formats: `pdf`, `html`, `md`            | `pdf html md`        |
 | `PREPRESS`        | PDF print/book layout (recto starts + binding margins)         | `false`              |
 | `ASCIIDOCTOR_COMMON_OPTS` | Extra CLI flags passed to both `asciidoctor` and `asciidoctor-pdf` (e.g. `--trace`) | (empty) |
 | `ASCIIDOCTOR_PDF_OPTS`    | Extra CLI flags passed to `asciidoctor-pdf` only               | (empty)              |
@@ -87,9 +87,16 @@ CI sets the version separately via `RELEASE_VERSION`.
 
 ### Markdown output
 
-Set `FORMATS="pdf html md"` in a curriculum's `build.config` (or run `build.sh md EN`) to also
-produce `build/<CURRICULUM_FILE>-<lang>.md`, e.g. for use with AI agents. Images are copied to
+By default (`FORMATS="pdf html md"`) the build also produces `build/<CURRICULUM_FILE>-<lang>.md`,
+e.g. for use with AI agents; set `FORMATS="pdf html"` in a curriculum's `build.config` to skip it
+(or run `build.sh md EN` for Markdown only). Images are copied to
 `build/images/` and referenced relatively, as for HTML.
+
+A full build (no positional arguments) with `md` in `FORMATS` also writes `build/llms.txt`
+(see [llmstxt.org](https://llmstxt.org)): the curriculum title, the release version
+(`Release candidate` for `*-RC*` versions) and relative links to the Markdown files, followed by
+the PDF and HTML files under `## Optional`. Relative links keep it valid wherever `build/` is
+published, e.g. in a GitHub Pages subdirectory.
 
 The Markdown is produced by `extensions/markdown-converter.rb`, a converter for Asciidoctor
 itself: Asciidoctor parses the curriculum as usual (includes, language tags, conditionals,

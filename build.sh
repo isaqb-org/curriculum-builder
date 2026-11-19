@@ -4,6 +4,7 @@
 #   build.sh pdf DE          # single format + language
 #   build.sh pdf DE REMARKS  # + suffix tag
 #   build.sh md EN           # Markdown (format: pdf | html | md)
+# A full build with md in FORMATS also writes build/llms.txt.
 #   build.sh clean           # remove build/ outputs
 # Config precedence: environment > repo build.config > baked default.
 set -eu
@@ -29,7 +30,7 @@ fi
 LANGUAGES=${LANGUAGES:-"DE EN"}
 SUFFIX_TAGS=${SUFFIX_TAGS:-""}
 PREPRESS=${PREPRESS:-false}
-FORMATS=${FORMATS:-"pdf html"}
+FORMATS=${FORMATS:-"pdf html md"}
 VALID_FROM=${VALID_FROM:-""}
 ASCIIDOCTOR_COMMON_OPTS=${ASCIIDOCTOR_COMMON_OPTS:-""}
 ASCIIDOCTOR_PDF_OPTS=${ASCIIDOCTOR_PDF_OPTS:-""}
@@ -108,15 +109,20 @@ copy_images() {
   }
 }
 
+lower() { echo "$1" | tr '[:upper:]' '[:lower:]'; }
+
+# Output file name without extension, e.g. curriculum-remarks-en
+base_name() {
+  printf '%s%s-%s' "$CURRICULUM_FILE" "${2:+-$(lower "$2")}" "$(lower "$1")"
+}
+
 render() {
   format=$1; lang=$2; suffix=$3
   case "$format" in
     pdf|html|md) ;;
     *) echo "unknown format '$format' (expected: pdf, html, md)" >&2; exit 1 ;;
   esac
-  suffix_part=""
-  [ -n "$suffix" ] && suffix_part="-$(echo "$suffix" | tr '[:upper:]' '[:lower:]')"
-  lang_lc=$(echo "$lang" | tr '[:upper:]' '[:lower:]')
+  name=$(base_name "$lang" "$suffix")
 
   docver="${VERSION}-${lang}-${VERSION_DATE}$(format_validity "$lang")"
 
@@ -132,21 +138,21 @@ render() {
     set -- "$@" $ASCIIDOCTOR_COMMON_OPTS $ASCIIDOCTOR_PDF_OPTS
     asciidoctor-pdf -r "$PAGE_NUMBERING_RB" -r "$LG_OVERVIEW_RB" \
       --base-dir "$DOCS" -D "$OUT" "$@" "$DOCS/${CURRICULUM_FILE}.adoc"
-    mv "$OUT/${CURRICULUM_FILE}.pdf" "$OUT/${CURRICULUM_FILE}${suffix_part}-${lang_lc}.pdf"
+    mv "$OUT/${CURRICULUM_FILE}.pdf" "$OUT/${name}.pdf"
   elif [ "$format" = "md" ]; then
     copy_images
     set -- $(common_attrs "$lang" "$suffix")
     # Metadata for the front matter: the PDF of the same language (only if PDFs are built) and
     # the validity date (only if VALID_FROM is a valid YYYY/MM/DD date).
     case " $FORMATS " in
-      *" pdf "*) set -- "$@" -a "md-pdf-file=${CURRICULUM_FILE}${suffix_part}-${lang_lc}.pdf" ;;
+      *" pdf "*) set -- "$@" -a "md-pdf-file=${name}.pdf" ;;
     esac
     [ -n "$(format_validity "$lang")" ] && set -- "$@" -a "md-valid-from=$(echo "$VALID_FROM" | tr / -)"
     # shellcheck disable=SC2086 # intentional word-splitting: *_OPTS may hold multiple CLI flags
     set -- "$@" $ASCIIDOCTOR_COMMON_OPTS $ASCIIDOCTOR_MD_OPTS
     asciidoctor -r "$MARKDOWN_RB" -r "$LG_OVERVIEW_RB" -b markdown \
       --base-dir "$DOCS" -D "$OUT" "$@" "$DOCS/${CURRICULUM_FILE}.adoc"
-    mv "$OUT/${CURRICULUM_FILE}.md" "$OUT/${CURRICULUM_FILE}${suffix_part}-${lang_lc}.md"
+    mv "$OUT/${CURRICULUM_FILE}.md" "$OUT/${name}.md"
   else
     [ -d "$OUT/$HTML_THEME_OUT_DIR/fonts" ] || [ ! -d "$HTML_THEME_DIR/fonts" ] || {
       mkdir -p "$OUT/$HTML_THEME_OUT_DIR"
@@ -177,9 +183,54 @@ render() {
     asciidoctor -r "$LG_OVERVIEW_RB" \
       --base-dir "$DOCS" -D "$OUT" "$@" \
       "$DOCS/index.adoc" "$DOCS/${CURRICULUM_FILE}.adoc"
-    mv "$OUT/${CURRICULUM_FILE}.html" "$OUT/${CURRICULUM_FILE}${suffix_part}-${lang_lc}.html"
+    mv "$OUT/${CURRICULUM_FILE}.html" "$OUT/${name}.html"
   fi
-  echo "  -> build/${CURRICULUM_FILE}${suffix_part}-${lang_lc}.${format}"
+  echo "  -> build/${name}.${format}"
+}
+
+# llms.txt (https://llmstxt.org): index of the built files for AI agents. Links are
+# relative, so they work wherever build/ is published (e.g. GitHub Pages subdirectories).
+write_llms_txt() {
+  case " $FORMATS " in *" md "*) ;; *) return 0 ;; esac
+
+  # Title from the front matter (after the opening --- in line 1, up to the closing ---) of the
+  # first English Markdown, or of the first one
+  title_variant=${variants%% *}
+  for v in $variants; do
+    case "$v" in EN:*) title_variant=$v; break ;; esac
+  done
+  title=$(sed -n '2,/^---$/s/^title: "\(.*\)"$/\1/p' \
+    "$OUT/$(base_name "${title_variant%%:*}" "${title_variant#*:}").md" \
+    | sed 's/\\"/"/g; s/\\\\/\\/g')
+
+  case "$VERSION" in
+    LocalBuild) kind="Local build" ;;
+    *-RC*)      kind="Release candidate $VERSION" ;;
+    *)          kind="Release $VERSION" ;;
+  esac
+
+  {
+    printf '# %s\n\n' "${title:-$CURRICULUM_FILE}"
+    printf '> %s of this iSAQB curriculum. Each Markdown file contains the complete curriculum in one language.\n\n' "$kind"
+    printf '## Curriculum\n\n'
+    for v in $variants; do
+      lang=${v%%:*}; sfx=${v#*:}
+      name=$(base_name "$lang" "$sfx")
+      printf -- '- [%s](%s.md)\n' "$lang${sfx:+ ($sfx)}" "$name"
+    done
+
+    # PDF and HTML files, if built
+    optional=
+    for fmt in pdf html; do
+      case " $FORMATS " in *" $fmt "*) ;; *) continue ;; esac
+      [ -n "$optional" ] || { printf '\n## Optional\n\n'; optional=1; }
+      for v in $variants; do
+        file="$(base_name "${v%%:*}" "${v#*:}").$fmt"
+        printf -- '- [%s](%s)\n' "$file" "$file"
+      done
+    done
+  } > "$OUT/llms.txt"
+  echo "  -> build/llms.txt"
 }
 
 if [ "$#" -ge 2 ]; then
@@ -187,14 +238,20 @@ if [ "$#" -ge 2 ]; then
   exit 0
 fi
 
-for fmt in $FORMATS; do
-  for lang in $LANGUAGES; do
-    if [ -z "$SUFFIX_TAGS" ]; then
-      echo "[$fmt $lang]"; render "$fmt" "$lang" ""
-    else
-      for sfx in $SUFFIX_TAGS; do
-        echo "[$fmt $lang $sfx]"; render "$fmt" "$lang" "$sfx"
-      done
-    fi
+# Every language x suffix variant as LANG:SUFFIX (suffix may be empty)
+variants=
+for lang in $LANGUAGES; do
+  for sfx in ${SUFFIX_TAGS:--}; do
+    [ "$sfx" = "-" ] && sfx=
+    variants="${variants:+$variants }$lang:$sfx"
   done
 done
+
+for fmt in $FORMATS; do
+  for v in $variants; do
+    lang=${v%%:*}; sfx=${v#*:}
+    echo "[$fmt $lang${sfx:+ $sfx}]"; render "$fmt" "$lang" "$sfx"
+  done
+done
+
+write_llms_txt
