@@ -193,22 +193,14 @@ render() {
 write_llms_txt() {
   case " $FORMATS " in *" md "*) ;; *) return 0 ;; esac
 
-  # Every language x suffix variant as LANG:SUFFIX (suffix may be empty)
-  variants=
-  for lang in $LANGUAGES; do
-    for sfx in ${SUFFIX_TAGS:--}; do
-      [ "$sfx" = "-" ] && sfx=
-      variants="${variants:+$variants }$lang:$sfx"
-    done
-  done
-
-  # Title from the front matter of the first English Markdown (or the first one)
+  # Title from the front matter (after the opening --- in line 1, up to the closing ---) of the
+  # first English Markdown, or of the first one
   title_variant=${variants%% *}
   for v in $variants; do
     case "$v" in EN:*) title_variant=$v; break ;; esac
   done
-  title=$(sed -n '/^---$/,/^---$/s/^title: "\(.*\)"$/\1/p' \
-    "$OUT/$(base_name "${title_variant%%:*}" "${title_variant#*:}").md" | head -n 1 \
+  title=$(sed -n '2,/^---$/s/^title: "\(.*\)"$/\1/p' \
+    "$OUT/$(base_name "${title_variant%%:*}" "${title_variant#*:}").md" \
     | sed 's/\\"/"/g; s/\\\\/\\/g')
 
   case "$VERSION" in
@@ -246,15 +238,19 @@ if [ "$#" -ge 2 ]; then
   exit 0
 fi
 
+# Every language x suffix variant as LANG:SUFFIX (suffix may be empty)
+variants=
+for lang in $LANGUAGES; do
+  for sfx in ${SUFFIX_TAGS:--}; do
+    [ "$sfx" = "-" ] && sfx=
+    variants="${variants:+$variants }$lang:$sfx"
+  done
+done
+
 for fmt in $FORMATS; do
-  for lang in $LANGUAGES; do
-    if [ -z "$SUFFIX_TAGS" ]; then
-      echo "[$fmt $lang]"; render "$fmt" "$lang" ""
-    else
-      for sfx in $SUFFIX_TAGS; do
-        echo "[$fmt $lang $sfx]"; render "$fmt" "$lang" "$sfx"
-      done
-    fi
+  for v in $variants; do
+    lang=${v%%:*}; sfx=${v#*:}
+    echo "[$fmt $lang${sfx:+ $sfx}]"; render "$fmt" "$lang" "$sfx"
   done
 done
 
