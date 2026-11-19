@@ -224,7 +224,7 @@ write_llms_txt() {
     for v in $variants; do
       lang=${v%%:*}; sfx=${v#*:}
       name=$(base_name "$lang" "$sfx")
-      printf -- '- [%s](%s.md): %s.md\n' "$lang${sfx:+ ($sfx)}" "$name" "$name"
+      printf -- '- [%s](%s.md)\n' "$lang${sfx:+ ($sfx)}" "$name"
     done
 
     # PDF and HTML files, if built
