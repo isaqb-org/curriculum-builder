@@ -1,6 +1,6 @@
 # Base image pinned to an explicit version + multi-arch manifest digest.
 # Renovate's Docker manager keeps both the tag and the digest current.
-FROM ruby:4.0.9-alpine3.23@sha256:50e543181711af8f97d5a9e8acb92cdaa82bd804410295ac682cdc99243ca142 AS builder
+FROM ruby:4.0.10-alpine3.23@sha256:24be9067c09756e3c5d8315bc1c91d069e89b122b05d0f4f01eb06d7500308ea AS builder
 ENV GEM_HOME=/opt/gems
 ENV PATH=$GEM_HOME/bin:$PATH
 
@@ -23,7 +23,7 @@ RUN apk add --no-cache build-base git \
     done \
  && rm -rf /opt/isaqb/pdf-theme/.git /opt/isaqb/html-theme/.git
 
-FROM ruby:4.0.9-alpine3.23@sha256:50e543181711af8f97d5a9e8acb92cdaa82bd804410295ac682cdc99243ca142
+FROM ruby:4.0.10-alpine3.23@sha256:24be9067c09756e3c5d8315bc1c91d069e89b122b05d0f4f01eb06d7500308ea
 ENV GEM_HOME=/opt/gems
 ENV PATH=$GEM_HOME/bin:$PATH
 
